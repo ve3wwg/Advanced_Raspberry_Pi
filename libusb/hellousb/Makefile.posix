@@ -1,0 +1,28 @@
+PREFIX          ?= /usr/local
+CXX             = g++
+CC              = gcc
+INCL            = -I.
+WARNS           = -Wall -Wno-deprecated 
+STD             ?= c++11
+OPTZ            ?= -g -O0
+
+CXXFLAGS        = -std=$(STD) $(WARNS) $(INCL)
+
+ifneq ($(V),1)
+Q := @
+endif
+
+.cpp.o:
+	@echo "  CXX $<"
+	$(Q)$(CXX) -c $(CXXFLAGS) $(OPTZ) $< -o $*.o
+
+phellousb: phellousb.o
+	$(CXX) $(CFLAGS) phellousb.o -o phellousb -lusb
+
+clean:
+	rm -f *.o phellousb
+
+clobber: clean
+	rm -f hellousb.ihx
+
+
