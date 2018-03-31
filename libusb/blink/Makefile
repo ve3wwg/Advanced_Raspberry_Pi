@@ -1,15 +1,17 @@
+BUS	= 001
+DEV	= 005
+
 blink:
 	$(CC) $(CFLAGS) blink.c
 
-# Bus 001 Device 003: ID 04b4:8613 (unconfigured FX2)
 list:
-	$(PROG) --list # [-d=BUS.DEV]
+	$(PROG) --list
 
 prog:
-	sudo $(PROG) -d=001.003 reset prg:blink.ihx run
+	sudo $(PROG) -d=$(BUS).$(DEV) reset prg:blink.ihx run
 
 reset:
-	sudo $(PROG) -d=001.003 reset
+	sudo $(PROG) -d=$(BUS).$(DEV) reset
 
 clobber: clean
 	rm -f blink.ihx
