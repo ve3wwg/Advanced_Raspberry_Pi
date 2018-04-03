@@ -524,6 +524,15 @@ __sfr __at(0xF8) EIP; /* EIP Bit Values differ from Reg320 */
    Bit Masks
 -----------------------------------------------------------------------------*/
 
+#define bmBIT0		(1<<0)
+#define bmBIT1		(1<<1)
+#define bmBIT2		(1<<2)
+#define bmBIT3		(1<<3)
+#define bmBIT4		(1<<4)
+#define bmBIT5		(1<<5)
+#define bmBIT6		(1<<6)
+#define bmBIT7		(1<<7)
+
 /* CPU Control & Status Register (CPUCS) */
 #define bmPRTCSTB    bmBIT5
 #define bmCLKSPD     (bmBIT4 | bmBIT3)
