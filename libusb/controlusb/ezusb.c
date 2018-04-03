@@ -10,35 +10,34 @@
 static void
 initialize(void) {
 
-	CPUCS = 0x10;		// 48 MHz, CLKOUT output disabled.
+	CPUCS = 0x10;		// 48 MHz, CLKOUT disabled.
 	SYNCDELAY;		
-	IFCONFIG = 0xc0;	// Internal IFCLK, 48MHz; A,B as normal ports.
+	IFCONFIG = 0xc0;	// Internal IFCLK @ 48MHz
 	SYNCDELAY;		
-	REVCTL = 0x03;
+	REVCTL = 0x03;		// Disable auto-arm + Enhanced packet handling
 	SYNCDELAY;		
-	EP6CFG = 0xE2;		// 1110 0010 bulk IN, 512 bytes, double-buffered
+	EP6CFG = 0xE2;		// 1110_0010 bulk IN, 512 bytes, double-buffered
 	SYNCDELAY;
-	EP2CFG = 0xA2;		// 1010 0010 bulk OUT, 512 bytes, double-buffered
+	EP2CFG = 0xA2;		// 1010_0010 bulk OUT, 512 bytes, double-buffered
 	SYNCDELAY;
 	FIFORESET = 0x80;	// NAK all requests from host.
 	SYNCDELAY;	
-	FIFORESET = 0x82;	// Reset individual EP (2,4,6,8)
+	FIFORESET = 0x82;	// Reset EP 2
 	SYNCDELAY;	
-	FIFORESET = 0x84;
+	FIFORESET = 0x84;	// Reset EP 4..
 	SYNCDELAY;
 	FIFORESET = 0x86;
 	SYNCDELAY;
 	FIFORESET = 0x88;
 	SYNCDELAY;
-	FIFORESET = 0x00;	// Resume normal operation.
+	FIFORESET = 0x00;	// Back to normal..
 	SYNCDELAY;		
-	EP2FIFOCFG = 0x00;	// AUTOOUT=0
+	EP2FIFOCFG = 0x00;	// Disable AUTOOUT
 	SYNCDELAY;		
-	OUTPKTEND = 0x82;	// Clear the 2 buffers
+	OUTPKTEND = 0x82;	// Clear the 1st buffer
 	SYNCDELAY;		
 	OUTPKTEND = 0x82;	// ..both of them
 	SYNCDELAY;		
-	
 }
 
 //////////////////////////////////////////////////////////////////////
