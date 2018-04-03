@@ -8,7 +8,7 @@ list:
 	$(PROG) --list 
 
 prog:
-	@echo "*** Make sure you do sudo rmmod usbtest ***"
+	# sudo rmmod usbtest, if necessary
 	# or sudo sh -c "echo 'blacklist usbtest' >> /etc/modprobe.d/blacklist.conf"
 	sudo $(PROG) -d=$(BUS).$(DEV) prg:ezusb.ihx run delay:10 dbulk:6,-512,5
 
