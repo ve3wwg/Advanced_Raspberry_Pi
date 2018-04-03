@@ -1,5 +1,5 @@
-BUS	= 001
-DEV	= 005
+BUS	?= 001
+DEV	?= 005
 
 blink:
 	$(CC) $(CFLAGS) blink.c
@@ -7,7 +7,7 @@ blink:
 list:
 	$(PROG) --list
 
-prog:
+prog:	blink
 	sudo $(PROG) -d=$(BUS).$(DEV) reset prg:blink.ihx run
 
 reset:
