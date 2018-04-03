@@ -19,7 +19,7 @@ reset:
 	sudo $(PROG) -d=$(BUS).$(DEV) reset
 
 clobber: clean
-	rm -f ezusb.ihx pezusb *.o .errs.t
+	rm -f ezusb.ihx pezusb *.o .errs.t controlusb
 
 include ../ezusb/Makefile.incl
 
