@@ -14,7 +14,7 @@ reset:
 	sudo $(PROG) -d=$(BUS).$(DEV) reset
 
 clobber: clean
-	rm -f blink.ihx
+	rm -f blink.ihx .errs.t
 
 include ../ezusb/Makefile.incl
 
