@@ -1,3 +1,9 @@
+//////////////////////////////////////////////////////////////////////
+// ezusb.c -- Example CY7C68013A firmware to control LEDS and
+//	      and demonstrate some bulk USB I/O.
+// Date: Mon Apr  2 22:49:16 2018   (C) ve3wwg@gmail.com
+///////////////////////////////////////////////////////////////////////
+
 #include <fx2regs.h>
 #include <fx2sdly.h>
 
@@ -5,9 +11,10 @@ static void
 initialize(void) {
 
 	CPUCS = 0x10;		// 48 MHz, CLKOUT output disabled.
+	SYNCDELAY;		
 	IFCONFIG = 0xc0;	// Internal IFCLK, 48MHz; A,B as normal ports.
 	SYNCDELAY;		
-	REVCTL = 0x03;		// See TRM...
+	REVCTL = 0x03;
 	SYNCDELAY;		
 	EP6CFG = 0xE2;		// 1110 0010 bulk IN, 512 bytes, double-buffered
 	SYNCDELAY;
@@ -34,6 +41,10 @@ initialize(void) {
 	
 }
 
+//////////////////////////////////////////////////////////////////////
+// Accept a command byte from EP2
+//////////////////////////////////////////////////////////////////////
+
 static void
 accept_cmd(void) {
 	__xdata const unsigned char *src = EP2FIFOBUF;
@@ -43,13 +54,15 @@ accept_cmd(void) {
 		return;		// Nothing to process
 	PA0 = *src & 1;		// Set PA0 LED
 	PA1 = *src & 2;		// Set PA1 LED
-
 	OUTPKTEND = 0x82;	// Release buffer
 }
 
+//////////////////////////////////////////////////////////////////////
+// Send a state message back to host over EP6
+//////////////////////////////////////////////////////////////////////
+
 static void
 send_state(void) {
-	// First, copy the data into the EP6 buffer.
 	__xdata unsigned char *dest = EP6FIFOBUF;
 	const char *msg1 = PA0 ? "PA0=1" : "PA0=0";
 	const char *msg2 = PA1 ? "PA1=1" : "PA1=0";
@@ -66,32 +79,32 @@ send_state(void) {
 		++len;
 	}
 
-	// Arm the endpoint. Be sure to set BCH before BCL because BCL access
-	// actually arms the endpoint.
 	SYNCDELAY;  
 	EP6BCH=0;
 	SYNCDELAY;  
-	EP6BCL=len;
-	
-	// Data will be transmitted the next time
+	EP6BCL=len;	// Arms the endpoint for transmission
 }
+
+//////////////////////////////////////////////////////////////////////
+// Main program
+//////////////////////////////////////////////////////////////////////
 
 void
 main(void) {
 
-	OEA = 0x03;		// Enable PA0 and PA1 outputs
-	initialize();
+	OEA = 0x03;	// Enable PA0 and PA1 outputs
+	initialize();	// Initialize USB
     
-	PA0 = 1;
+	PA0 = 1;	// Turn off LEDs..
 	PA1 = 1;
 
 	for (;;) {
-		if ( !(EP2CS & (1<<2)) )
-			accept_cmd();
+		if ( !(EP2CS & bmEPEMPTY) )
+			accept_cmd();	// Have data in EP2
 
-		if ( !(EP6CS & (1<<3)) ) {
-			// EP6 buffer is not full
-			send_state();
-		}
+		if ( !(EP6CS & bmEPFULL) )
+			send_state();	// EP6 is not full
 	}
 }
+
+// End ezusb.c
