@@ -7,7 +7,7 @@ blink:
 list:
 	$(PROG) --list
 
-prog:	blink
+prog:	blink.ihx
 	sudo $(PROG) -d=$(BUS).$(DEV) reset prg:blink.ihx run
 
 reset:
