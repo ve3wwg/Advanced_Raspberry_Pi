@@ -1,6 +1,8 @@
 BUS	?= 001
 DEV	?= 005
 
+all:	blink
+
 blink:
 	$(CC) $(CFLAGS) blink.c
 

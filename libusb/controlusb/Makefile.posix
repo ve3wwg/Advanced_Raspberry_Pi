@@ -11,8 +11,10 @@ CXXFLAGS        = -std=$(STD) $(WARNS) $(INCL)
 .cpp.o:
 	$(CXX) -c $(CXXFLAGS) $(OPTZ) $< -o $*.o
 
+all:	controlusb
+
 controlusb: controlusb.o
-	$(CXX) $(CFLAGS) controlusb.o -o controlusb -lusb
+	$(CXX) $(CFLAGS) controlusb.o -o controlusb -lusb-1.0
 
 clean:
 	rm -f *.o controlusb

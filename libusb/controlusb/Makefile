@@ -1,8 +1,13 @@
 BUS	?= 001
 DEV	?= 005
 
+all:	ezusb controlusb
+
 ezusb:
 	$(CC) $(CFLAGS) ezusb.c
+
+controlusb:
+	$(MAKE) -$(MAKEFLAGS) -f Makefile.posix all
 
 list:
 	$(PROG) --list 
