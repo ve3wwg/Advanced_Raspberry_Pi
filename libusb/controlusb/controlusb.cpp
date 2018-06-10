@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////
-// phellousb.cpp -- Communicate with EZ-USB using Bulk EP
+// controlusb.cpp -- Communicate with EZ-USB using Bulk EP
 // Date: Fri Mar 30 09:54:18 2018   (C) ve3wwg@gmail.com
 ///////////////////////////////////////////////////////////////////////
 
@@ -169,4 +169,4 @@ main(int argc,char **argv) {
 	return 0;
 }
 
-// End phellousb.cpp
+// End controlusb.cpp
