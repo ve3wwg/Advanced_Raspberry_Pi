@@ -73,25 +73,40 @@ Tty::getc(int timeout_ms) {
 	return ch;				// Return char
 }
 
+//////////////////////////////////////////////////////////////////////
+// Locate USB device by vendor and product ID
+//////////////////////////////////////////////////////////////////////
+
 static libusb_device_handle *
 find_usb_device(unsigned id_vendor,unsigned id_product) {
 	
 	if ( !usb_devs ) {
-		libusb_init(nullptr);
+		libusb_init(nullptr);		// Initialize
+		// Fetch list of devices
 		n_devices = libusb_get_device_list(nullptr,&usb_devs);
 		if ( n_devices < 0 )
-			return nullptr;		// Fail
+			return nullptr;		// Failed
 	}
-
-	return libusb_open_device_with_vid_pid(nullptr,id_vendor,id_product);
+	return libusb_open_device_with_vid_pid(
+		nullptr,id_vendor,id_product);
 }
+
+//////////////////////////////////////////////////////////////////////
+// Close usb library
+//////////////////////////////////////////////////////////////////////
 
 static void
 close_usb() {
 
-	libusb_free_device_list(usb_devs,1);
-	libusb_exit(nullptr);
+	if ( usb_devs ) {
+		libusb_free_device_list(usb_devs,1);
+		libusb_exit(nullptr);
+	}
 }
+
+//////////////////////////////////////////////////////////////////////
+// Perform a bulk read
+//////////////////////////////////////////////////////////////////////
 
 static int
 bulk_read(
@@ -110,6 +125,10 @@ bulk_read(
 		return xlen;
 	return -int(rc);
 }
+
+//////////////////////////////////////////////////////////////////////
+// Perform a bulk write
+//////////////////////////////////////////////////////////////////////
 
 static int
 bulk_write(
@@ -138,28 +157,39 @@ bulk_write(
 	}
 }
 
+//////////////////////////////////////////////////////////////////////
+// Main program:
+//////////////////////////////////////////////////////////////////////
+
 int
 main(int argc,char **argv) {
 	Tty tty;
 	int rc, ch;
 	char buf[513];
-	unsigned id_vendor = 0x04b4, id_product = 0x8613;
-	libusb_device_handle *hdev = find_usb_device(id_vendor,id_product);
+	unsigned id_vendor = 0x04b4,
+		id_product = 0x8613;
+	libusb_device_handle *hdev;
 	unsigned state = 0b0011;
 
+	hdev = find_usb_device(id_vendor,id_product);
 	if ( !hdev ) {
-		fprintf(stderr,"Device not found. Vendor=0x%04X Product=0x%04X\n",id_vendor,id_product);
+		fprintf(stderr,
+			"Device not found. "
+			"Vendor=0x%04X Product=0x%04X\n",
+			id_vendor,id_product);
 		return 1;
 	}
 
 	rc = libusb_claim_interface(hdev,0);
 	if ( rc != 0 ) {
-		fprintf(stderr,"%s: Claiming interface 0.\n",libusb_strerror(libusb_error(rc)));
+		fprintf(stderr,
+			"%s: Claiming interface 0.\n",
+			libusb_strerror(libusb_error(rc)));
 		libusb_close(hdev);
 		return 2;
 	}
 
-	printf("Interface CLAIMED:\n");
+	printf("Interface claimed:\n");
 
 	if ( (rc = libusb_set_interface_alt_setting(hdev,0,1)) != 0 ) {
 		fprintf(stderr,"%s: libusb_set_interface_alt_setting(h,0,1)\n",libusb_strerror(libusb_error(rc)));
@@ -168,18 +198,22 @@ main(int argc,char **argv) {
 
 	tty.raw_mode();
 
+	// Main loop:
+
 	for (;;) {
 		if ( (ch = tty.getc(500)) == -1 ) {
-			// Timed out: Try to read EP6
+			// Timed out: Try to read from EP6
 			rc = bulk_read(hdev,0x86,buf,512,10/*ms*/);
 			if ( rc < 0 ) {
-				printf("%s: bulk_read()\n\r",libusb_strerror(libusb_error(-rc)));
+				fprintf(stderr,
+					"%s: bulk_read()\n\r",
+					libusb_strerror(libusb_error(-rc)));
 				break;
-			} else	{
-				assert(rc < int(sizeof buf));
-				buf[rc] = 0;
-				printf("Read %d bytes: %s\n\r",rc,buf);
 			}
+
+			assert(rc < int(sizeof buf));
+			buf[rc] = 0;
+			printf("Read %d bytes: %s\n\r",rc,buf);
 			if ( !isatty(0) )
 				break;
 		} else	{
@@ -191,9 +225,13 @@ main(int argc,char **argv) {
 				state ^= mask;
 				buf[0] = state;
 				rc = bulk_write(hdev,0x02,buf,1,10/*ms*/);
-				if ( rc < 0 )
-					printf("%s: write bulk to EP 2\n",libusb_strerror(libusb_error(-rc)));
-				else	printf("Wrote %d bytes: 0x%02X  (state 0x%02X)\n",rc,unsigned(buf[0]),state);
+				if ( rc < 0 ) {
+					fprintf(stderr,
+						"%s: write bulk to EP 2\n",
+						libusb_strerror(libusb_error(-rc)));
+					break;
+				}
+				printf("Wrote %d bytes: 0x%02X  (state 0x%02X)\n",rc,unsigned(buf[0]),state);
 			} else	{
 				printf("Press q to quit, else 0 or 1 to toggle LED.\n");
 			}
@@ -201,6 +239,7 @@ main(int argc,char **argv) {
 	}
 
 	rc = libusb_release_interface(hdev,0);
+	assert(!rc);
 	libusb_close(hdev);
 
 	close_usb();
