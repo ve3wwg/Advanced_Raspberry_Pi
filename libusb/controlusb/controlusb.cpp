@@ -192,7 +192,8 @@ main(int argc,char **argv) {
 	printf("Interface claimed:\n");
 
 	if ( (rc = libusb_set_interface_alt_setting(hdev,0,1)) != 0 ) {
-		fprintf(stderr,"%s: libusb_set_interface_alt_setting(h,0,1)\n",libusb_strerror(libusb_error(rc)));
+		fprintf(stderr,"%s: libusb_set_interface_alt_setting(h,0,1)\n",
+			libusb_strerror(libusb_error(rc)));
 		return 3;
 	}
 
