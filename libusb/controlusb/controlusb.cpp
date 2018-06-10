@@ -232,7 +232,8 @@ main(int argc,char **argv) {
 						libusb_strerror(libusb_error(-rc)));
 					break;
 				}
-				printf("Wrote %d bytes: 0x%02X  (state 0x%02X)\n",rc,unsigned(buf[0]),state);
+				printf("Wrote %d bytes: 0x%02X  (state 0x%02X)\n",
+					rc,unsigned(buf[0]),state);
 			} else	{
 				printf("Press q to quit, else 0 or 1 to toggle LED.\n");
 			}
