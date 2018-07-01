@@ -1,12 +1,8 @@
 #!/bin/bash
-######################################################################
-#  Mastering the Raspberry Pi, ISBN13: 978-1-484201-82-4
-#  Warren W. Gay VE3WWG
-######################################################################
 
-ALO="${1:-0}" # 1=active low, else 0
-INP=25        # Read from GPIO 25 (GEN6)
-OUT=24        # Write to GPIO 24 (GEN5)
+INP="${1:-25}"  # Read from GPIO 25 (GEN6)
+OUT="${2:-24}"	# Write to GPIO 24 (GEN5)
+ALO="${3:-0}"	# 1=active low, else 0
 
 set -eu
 trap "close_all" 0
@@ -55,6 +51,4 @@ while true ; do
   fi
 done
 
-######################################################################
-#  End input.  Public Domain license.
-######################################################################
+# End
