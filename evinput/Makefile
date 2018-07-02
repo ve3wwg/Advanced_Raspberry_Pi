@@ -14,7 +14,7 @@ all:	$(OBJS)
 	sudo chmod u+s ./evinput
 
 clean:
-	rm -f *.o core errs.t
+	rm -f *.o core .errs.t
 
 clobber: clean
 	rm -f evinput
