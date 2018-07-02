@@ -320,28 +320,43 @@ peripheral_base() {
 static void
 usage(const char *cmd) {
 
-	printf("Usage: %s [-g gpio] { input_opts | output_opts | -a }\n"
+	printf("Usage: %s [-g gpio] { input_opts | output_opts | -a | drive_opts} [-v]\n"
 		"where:\n"
 		"\t-g gpio\tGPIO number to operate on\n"
+		"\t-v\tVerbose messages\n"
+		"\t-a\tQuery alt function\n"
+		"\t-A n\tSet alternate function n\n"
+		"\t-q\tQuery drive, slew and hysteresis\n"
 		"\n"
 		"Input options:\n"
-		"\t-i\tSelects input mode\n"
+		"\t-i n\tSelects input mode, reading for n seconds\n"
+		"\t-I\tInput mode, but performing one read only\n"
 		"\t-u\tSelects pull-up resistor\n"
 		"\t-d\tSelects pull-down resistor\n"
 		"\t-n\tSelects no pull-up/down resistor\n"
 		"\n"
 		"Output options:\n"
+		"\t-o n\tWrite 0 or 1 to gpio output\n"
+		"\n"
+		"Drive Options:\n"
+		"\t-D n\tSet drive level to 0-7\n"
+		"\t-S\tEnable slew rate limiting\n"
+		"\t-H\tEnable hysteresis\n"
 		,cmd);
 }
 
 int
 main(int argc,char **argv) {
-	static char options[] = "hg:i:udnvo:a";
+	static char options[] = "hg:i:Iudnvo:aA:D:H:S:q";
 	bool opt_verbose = false;
 	int opt_gpio = 17;
-	int opt_input = 0;
+	int opt_input = -1;
 	int opt_output = -1;
 	int opt_altq = false;
+	int opt_alt = -1;
+	int opt_Drive = -1;
+	int opt_Hysteresis = -1, opt_Slew = -1;
+	int opt_query = -1;
 	Pull opt_pull = Up;
 	int oc, rc;
 
@@ -356,7 +371,12 @@ main(int argc,char **argv) {
 			}
 			break;
 		case 'i':
-			opt_input = atoi(optarg);
+			if ( optarg )
+				opt_input = atoi(optarg);
+			else	opt_input = 0;
+			break;
+		case 'I':
+			opt_input = 0;
 			break;
 		case 'o':
 			opt_output = atoi(optarg);
@@ -373,6 +393,28 @@ main(int argc,char **argv) {
 		case 'a':
 			opt_altq = true;
 			break;
+		case 'A':
+			opt_alt = atoi(optarg);
+			if ( opt_alt < 0 || opt_alt > 5 ) {
+				fprintf(stderr,"Must be 0-5: -A %s\n",optarg);
+				exit(1);
+			}
+			break;
+		case 'D':
+			opt_Drive = atoi(optarg);
+			if ( opt_Drive < 0 || opt_Drive > 7 ) {
+				fprintf(stderr,"Invalid range: -D %s\n",optarg);
+				exit(1);
+			}
+			break;
+		case 'H':
+			opt_Hysteresis = !!atoi(optarg);
+			break;
+		case 'S':
+			opt_Slew = !!atoi(optarg);
+			break;
+		case 'q':
+			opt_query = true;
 		case 'v':
 			opt_verbose = true;
 			break;
@@ -400,7 +442,7 @@ main(int argc,char **argv) {
 	if ( opt_verbose )
 		printf("gpio_peri_base = %08X\n",peri_base);
 
-	if ( opt_input > 0 ) {
+	if ( opt_input >= 0 ) {
 		gpio_configure_io(opt_gpio,Input);
 		gpio_configure_pullup(opt_gpio,opt_pull);
 	
@@ -419,6 +461,14 @@ main(int argc,char **argv) {
 		gpio_write(opt_gpio,opt_output);		
 		if ( opt_verbose )
 			printf("Wrote %d to gpio %d\n",opt_output,opt_gpio);
+	}
+
+	if ( opt_alt >= 0 ) {
+		static IO alts[] = { Alt0, Alt1, Alt2, Alt3, Alt4, Alt5 };
+		IO io = alts[opt_alt];
+
+		rc = gpio_configure_io(opt_gpio,io);
+		assert(!rc);
 	}
 
 	if ( opt_altq ) {
@@ -456,6 +506,34 @@ main(int argc,char **argv) {
 		}
 
 		printf("GPIO %d is in %s mode.\n",opt_gpio,alt);
+	}
+
+	if ( opt_Drive >= 0 ) {
+		bool slew_limited = !!(opt_Slew >= 0 ? opt_Slew : 0);
+		bool hysteresis = opt_Hysteresis >= 0 ? opt_Hysteresis : 0;
+
+		gpio_set_drive_strength(opt_gpio,
+			slew_limited,
+			hysteresis,
+			opt_Drive);
+		if ( opt_verbose )
+			printf("  Set Drive=%d, slew=%s, hysteresis=%s\n",
+				opt_Drive,
+				slew_limited ? "true" : "false",
+				hysteresis ? "true" : "false");
+	}
+
+	if ( opt_query ) {
+		bool slew_limited, hysteresis;
+		int drive;
+
+		rc = gpio_get_drive_strength(opt_gpio,&slew_limited,&hysteresis,&drive);
+		assert(!rc);
+
+		printf("  Got Drive=%d, slew=%s, hysteresis=%s\n",
+			drive,
+			slew_limited ? "true" : "false",
+			hysteresis ? "true" : "false");
 	}
 
 	return 0;
