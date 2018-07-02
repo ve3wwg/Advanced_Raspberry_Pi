@@ -72,19 +72,27 @@ uint32_v *upads = 0;
 #define GPIO_PADS00_27	0x7E10002C
 #define GPIO_PADS28_45	0x7E100030 
 
-uint32_v *
+//////////////////////////////////////////////////////////////////////
+// Internal helper functions
+//////////////////////////////////////////////////////////////////////
+
+static uint32_v *
 set_gpio10(int gpio,int *shift,uint32_t base) {
 	uint32_t offset = gpio / 10;
 	*shift = gpio % 10 * 3;
 	return GPIOREG2(base,offset);
 }
 
-uint32_v *
+static uint32_v *
 set_gpio32(int gpio,int *shift,uint32_t base) {
     uint32_t offset = gpio / 32;
     *shift = gpio % 32;
     return GPIOREG2(base,offset);
 }
+
+//////////////////////////////////////////////////////////////////////
+// Configure a GPIO mode
+//////////////////////////////////////////////////////////////////////
 
 int
 gpio_configure_io(int gpio,IO io) {
@@ -136,6 +144,10 @@ gpio_get_drive_strength(int gpio,bool *slew_limited,bool *hysteresis,int *drive)
 	return 0;
 }
 
+//////////////////////////////////////////////////////////////////////
+// Set the GPIO drive strength
+//////////////////////////////////////////////////////////////////////
+
 int
 gpio_set_drive_strength(int gpio,bool slew_limited,bool hysteresis,int drive) {
 
@@ -155,6 +167,10 @@ gpio_set_drive_strength(int gpio,bool slew_limited,bool hysteresis,int drive) {
 	*padreg = config;
 	return 0;
 }
+
+//////////////////////////////////////////////////////////////////////
+// Perform small delay
+//////////////////////////////////////////////////////////////////////
 
 void
 gpio_delay() {
@@ -203,7 +219,7 @@ gpio_configure_pullup(int gpio,Pull pull) {
 }
 
 //////////////////////////////////////////////////////////////////////
-// Read a GPIO pin
+// Read a GPIO port (single bit)
 //////////////////////////////////////////////////////////////////////
 
 int
@@ -219,7 +235,7 @@ gpio_read(int gpio) {
 }
 
 //////////////////////////////////////////////////////////////////////
-// Write a GPIO pin
+// Write a GPIO bit
 //////////////////////////////////////////////////////////////////////
 
 int
@@ -241,7 +257,7 @@ gpio_write(int gpio,int bit) {
 }
 
 //////////////////////////////////////////////////////////////////////
-// Read/Write all GPIO bits at once (this can segfault if not opened)
+// Read/Write all GPIO bits at once
 //////////////////////////////////////////////////////////////////////
 
 uint32_t
@@ -251,10 +267,9 @@ gpio_read32() {
 	return *gpiolev;
 }
 
-uint32_t
-sys_page_size() {
-	return (uint32_t) sysconf(_SC_PAGESIZE);
-}
+//////////////////////////////////////////////////////////////////////
+// Map memory for peripheral register access
+//////////////////////////////////////////////////////////////////////
 
 void *
 mailbox_map(off_t offset,size_t bytes) {
@@ -274,9 +289,9 @@ mailbox_map(off_t offset,size_t bytes) {
 	);
 	
 	if ( (long)map == -1L ) {
-		int er = errno;
+		int er = errno;		// Save errno
 		close(fd);
-		errno = er;
+		errno = er;		// Restore errno
 		return 0;
 	}
 	
@@ -284,18 +299,18 @@ mailbox_map(off_t offset,size_t bytes) {
 	return map;
 }
 
-int
-mailbox_unmap(void *addr,size_t bytes) {
+//////////////////////////////////////////////////////////////////////
+// Unmap memory
+//////////////////////////////////////////////////////////////////////
 
+int
+mailbox_unmap(uint32_v *addr,size_t bytes) {
 	return munmap((caddr_t)addr,bytes);
 }
 
-#if 0
-off_t
-mailbox_to_phys_addr(uint32_t bus_addr) {
-	return BUS2PHYS(bus_addr);
-}
-#endif
+//////////////////////////////////////////////////////////////////////
+// Determine peripheral base address
+//////////////////////////////////////////////////////////////////////
 
 uint32_t
 peripheral_base() {
@@ -303,7 +318,6 @@ peripheral_base() {
 	int fd, rc;
 	unsigned char buf[8];
 	
-	// Adjust for RPi2
 	fd = open("/proc/device-tree/soc/ranges",O_RDONLY);
 	if ( fd >= 0 ) {
 		rc = read(fd,buf,sizeof buf);
@@ -317,6 +331,10 @@ peripheral_base() {
 	
 	return pbase;
 }
+
+//////////////////////////////////////////////////////////////////////
+// Display command usage info:
+//////////////////////////////////////////////////////////////////////
 
 static void
 usage(const char *cmd) {
@@ -346,6 +364,10 @@ usage(const char *cmd) {
 		"\t-H\tEnable hysteresis\n"
 		,cmd);
 }
+
+//////////////////////////////////////////////////////////////////////
+// Main program:
+//////////////////////////////////////////////////////////////////////
 
 int
 main(int argc,char **argv) {
@@ -440,7 +462,7 @@ main(int argc,char **argv) {
 	}
 
 	uint32_t peri_base = peripheral_base();
-	uint32_t page_size = sys_page_size();
+	uint32_t page_size = sysconf(_SC_PAGESIZE);
 
         ugpio = (uint32_v *)mailbox_map(peri_base+GPIO_BASE_OFFSET,page_size);
 	upads = (uint32_v *)mailbox_map(peri_base+PADS_BASE_OFFSET,page_size);
@@ -563,6 +585,10 @@ main(int argc,char **argv) {
 			slew_limited ? "true" : "false",
 			hysteresis ? "true" : "false");
 	}
+
+	/* Unmap memory */
+	mailbox_unmap(ugpio,page_size);
+	mailbox_unmap(upads,page_size);
 
 	return 0;
 }
