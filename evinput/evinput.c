@@ -15,7 +15,7 @@
 #include <sys/poll.h>
 
 static int gpio_inpin = -1;	/* GPIO input pin */
-static int is_signaled = 0;	/* Exit program if signaled */
+static int is_signaled = 0;	/* Exit program when signaled */
 
 typedef enum {
 	gp_export=0,	/* /sys/class/gpio/export */
@@ -24,6 +24,13 @@ typedef enum {
 	gp_edge,	/* /sys/class/gpio%d/edge */
 	gp_value	/* /sys/class/gpio%d/value */
 } gpio_path_t;
+
+typedef enum {
+	none=0,		/* No edge detection */
+	rising,		/* Rising edge */
+	falling,	/* Falling edge */
+	both		/* Rising and falling edge */
+} gpio_edge_t;
 
 /*
  * Internal : Create a pathname for type in buf.
@@ -42,39 +49,57 @@ gpio_setpath(int pin,gpio_path_t type,char *buf,unsigned bufsiz) {
 }
 
 /*
+ * Open path, else report fail:
+ */
+static FILE *
+gpio_open(const char *path,const char *mode) {
+	FILE *f = fopen(path,mode);
+
+	if ( !f ) {
+		fprintf(stderr,
+			"%s: opening %s\n",
+			strerror(errno),
+			path);
+		exit(1);
+	}
+	return f;
+}
+
+/*
  * Open /sys/class/gpio%d/value for edge detection :
  */
-static int
-gpio_open_edge(int pin,const char *edge) {
+static FILE *
+gpio_open_edge(int pin,gpio_edge_t edge) {
+	static char *edge_str[] = {
+		"none", "rising", "falling", "both"
+	};
 	char buf[128];
 	FILE *f;
-	int fd;
 
 	/* Export pin : /sys/class/gpio/export */
 	gpio_setpath(pin,gp_export,buf,sizeof buf);
-	f = fopen(buf,"w");
-	assert(f);
+	f = gpio_open(buf,"w");
 	fprintf(f,"%d\n",pin);
 	fclose(f);
 
 	/* Direction :	/sys/class/gpio%d/direction */
 	gpio_setpath(pin,gp_direction,buf,sizeof buf);
-	f = fopen(buf,"w");
+	f = gpio_open(buf,"w");
 	assert(f);
 	fprintf(f,"in\n");
 	fclose(f);
 
 	/* Edge :	/sys/class/gpio%d/edge */
 	gpio_setpath(pin,gp_edge,buf,sizeof buf);
-	f = fopen(buf,"w");
+	f = gpio_open(buf,"w");
 	assert(f);
-	fprintf(f,"%s\n",edge);
+	fprintf(f,"%s\n",edge_str[edge]);
 	fclose(f);
 
 	/* Value :	/sys/class/gpio%d/value */
 	gpio_setpath(pin,gp_value,buf,sizeof buf);
-	fd = open(buf,O_RDWR);
-	return fd;
+	f = gpio_open(buf,"rw");
+	return f;
 }
 
 /*
@@ -138,13 +163,15 @@ sigint_handler(int signo) {
  */
 int
 main(int argc,char **argv) {
+	FILE *gf = NULL;
 	int fd, v;
 
 	/*
 	 * Get GPIO input pin to use :
 	 */
 	if ( argc != 2 ) {
-usage:		fprintf(stderr,"Usage: %s <gpio_in_pin>\n",argv[0]);
+usage:		fprintf(stderr,
+			"Usage: %s <gpio_in_pin>\n",argv[0]);
 		return 1;
 	}	
 	if ( sscanf(argv[1],"%d",&gpio_inpin) != 1 )
@@ -153,7 +180,8 @@ usage:		fprintf(stderr,"Usage: %s <gpio_in_pin>\n",argv[0]);
 		goto usage;
 
 	signal(SIGINT,sigint_handler);		/* Trap on SIGINT */
-	fd = gpio_open_edge(gpio_inpin,"both");	/* GPIO input */
+	gf = gpio_open_edge(gpio_inpin,both);	/* GPIO input */
+	fd = fileno(gf);			/* Extract file descriptor */
 
 	puts("Monitoring for GPIO input changes:\n");
 
@@ -162,13 +190,9 @@ usage:		fprintf(stderr,"Usage: %s <gpio_in_pin>\n",argv[0]);
 	} while ( !is_signaled );		/* Quit if ^C'd */
 
 	putchar('\n');
-	close(fd);				/* Close gpio%d/value */
+	fclose(gf);
 	gpio_close(gpio_inpin);			/* Unexport gpio */
 	return 0;
 }
 
-/*********************************************************************
- * End evinput.c - by Warren Gay
- * Mastering the Raspberry Pi - ISBN13: 978-1-484201-82-4
- * This source code is placed into the public domain.
- *********************************************************************/
+/* End */
