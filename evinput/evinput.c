@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <sys/poll.h>
 
-static int gpio_inpin = -1;	/* GPIO input pin */
+static int gpio_inpin = 17;	/* GPIO input pin */
 static int is_signaled = 0;	/* Exit program when signaled */
 
 typedef enum {
@@ -158,36 +158,60 @@ sigint_handler(int signo) {
 	is_signaled = 1;		/* Signal to exit program */
 }
 
+static void
+usage(const char *cmd) {
+	printf("Usage: %s -g gpio [-f] [-r] [-b]\n"
+		"where:\n"
+		"\t-f\tdetect rising edges\n"
+		"\t-r\tdetect falling edges\n"
+		"\t-b\tdetect both edges\n"
+		"\nDefaults are: -g17 -b\n",
+		cmd);
+}
+
 /*
  * Main program :
  */
 int
 main(int argc,char **argv) {
+	static char options[] = "hrfbg:";
+	gpio_edge_t opt_edge = both;
 	FILE *gf = NULL;
-	int fd, v;
+	int fd, v, oc;
 
-	/*
-	 * Get GPIO input pin to use :
-	 */
-	if ( argc != 2 ) {
-usage:		fprintf(stderr,
-			"Usage: %s <gpio_in_pin>\n",argv[0]);
-		return 1;
-	}	
-	if ( sscanf(argv[1],"%d",&gpio_inpin) != 1 )
-		goto usage;
-	if ( gpio_inpin < 0 || gpio_inpin >= 32 )
-		goto usage;
+	while ( (oc = getopt(argc,argv,options)) != -1 ) {
+		switch ( oc ) {
+		case 'h':
+			usage(argv[0]);
+			exit(0);
+		case 'g':
+			gpio_inpin = atoi(optarg);
+			break;
+		case 'r':
+			opt_edge = rising;
+			break;
+		case 'f':
+			opt_edge = falling;
+			break;
+		case 'b':
+			opt_edge = both;
+			break;
+		default:
+			usage(argv[0]);
+			exit(1);
+		}
+	}
 
 	signal(SIGINT,sigint_handler);		/* Trap on SIGINT */
-	gf = gpio_open_edge(gpio_inpin,both);	/* GPIO input */
+	gf = gpio_open_edge(gpio_inpin,opt_edge); /* GPIO input */
 	fd = fileno(gf);			/* Extract file descriptor */
 
 	puts("Monitoring for GPIO input changes:\n");
 
-	while ( (v = gpio_poll(fd)) >= 0 ) {	/* Block until input changes */
+	while ( !is_signaled
+	     && (v = gpio_poll(fd)) >= 0 ) {	/* Block until input changes */
 		printf("GPIO %d changed: %d\n",gpio_inpin,v);
-	} while ( !is_signaled );		/* Quit if ^C'd */
+	}
 
 	putchar('\n');
 	fclose(gf);
