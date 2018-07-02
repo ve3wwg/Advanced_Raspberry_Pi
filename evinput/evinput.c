@@ -125,15 +125,15 @@ gpio_close(int pin) {
  */
 static int
 gpio_poll(int fd) {
-	struct pollfd polls;
+	struct pollfd polls[1];
 	char buf[32];
 	int rc, n;
 	
-	polls.fd = fd;			/* /sys/class/gpio17/value */
-	polls.events = POLLPRI;		/* Exceptions */
+	polls[0].fd = fd;		/* /sys/class/gpio17/value */
+	polls[0].events = POLLPRI;	/* Events */
 	
 	do	{
-		rc = poll(&polls,1,-1);	/* Block */
+		rc = poll(polls,1,-1);	/* Block */
 		if ( is_signaled )
 			return -1;	/* Exit if ^C received */
 	} while ( rc < 0 && errno == EINTR );
