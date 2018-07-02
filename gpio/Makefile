@@ -6,15 +6,15 @@ CFLAGS	= $(OPTS) $(DBG)
 .c.o:
 	$(CC) -c $(CFLAGS) $< -o $*.o
 
-OBJS	= gpio.o
+OBJS	= gp.o
 
 all:	$(OBJS)
-	$(CC) $(OBJS) -o gpio
-	sudo chown root ./gpio
-	sudo chmod u+s ./gpio
+	$(CC) $(OBJS) -o gp
+	sudo chown root ./gp
+	sudo chmod u+s ./gp
 
 clean:
-	rm -f *.o core errs.t
+	rm -f *.o core .errs.t
 
 clobber: clean
-	rm -f gpio
+	rm -f gp
