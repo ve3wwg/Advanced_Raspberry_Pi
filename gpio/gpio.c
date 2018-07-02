@@ -228,11 +228,14 @@ gpio_write(int gpio,int bit) {
 	if ( gpio < 0 || gpio > 31 )
 		return EINVAL;
 
-	uint32_v *gpiop = set_gpio32(gpio,&shift,GPIO_GPSET0);
 
-	if ( bit )
+	if ( bit ) {
+		uint32_v *gpiop = set_gpio32(gpio,&shift,GPIO_GPSET0);
 	        *gpiop = 1u << shift;
-	else	*gpiop = 1u << shift;
+	} else	{
+		uint32_v *gpiop = set_gpio32(gpio,&shift,GPIO_GPCLR0);
+		*gpiop = 1u << shift;
+	}
 	return 0;
 }
 
@@ -317,7 +320,7 @@ peripheral_base() {
 static void
 usage(const char *cmd) {
 
-	printf("Usage: %s [-g gpio] { input_opts | output_opts }\n"
+	printf("Usage: %s [-g gpio] { input_opts | output_opts | -a }\n"
 		"where:\n"
 		"\t-g gpio\tGPIO number to operate on\n"
 		"\n"
@@ -333,13 +336,14 @@ usage(const char *cmd) {
 
 int
 main(int argc,char **argv) {
-	static char options[] = "hg:i:udnv";
+	static char options[] = "hg:i:udnvo:a";
 	bool opt_verbose = false;
 	int opt_gpio = 17;
 	int opt_input = 0;
+	int opt_output = -1;
 	int opt_altq = false;
 	Pull opt_pull = Up;
-	int oc;
+	int oc, rc;
 
 	while ( (oc = getopt(argc,argv,options)) != -1 ) {
 		switch ( oc ) {
@@ -353,6 +357,9 @@ main(int argc,char **argv) {
 			break;
 		case 'i':
 			opt_input = atoi(optarg);
+			break;
+		case 'o':
+			opt_output = atoi(optarg);
 			break;
 		case 'u':
 			opt_pull = Up;
@@ -405,8 +412,50 @@ main(int argc,char **argv) {
 			if ( nbit != gbit )
 				printf("GPIO = %d\n",gbit = nbit);
 		} while ( time(0) - t0 < opt_input );
-	} else	{
-		;
+	}
+
+	if ( opt_output >= 0 ) {
+		gpio_configure_io(opt_gpio,Output);
+		gpio_write(opt_gpio,opt_output);		
+		if ( opt_verbose )
+			printf("Wrote %d to gpio %d\n",opt_output,opt_gpio);
+	}
+
+	if ( opt_altq ) {
+		IO io;
+		const char *alt;
+
+		rc = gpio_alt_function(opt_gpio,&io);
+		assert(!rc);
+
+		switch ( io ) {
+		case Input:
+			alt = "Input";
+			break;
+		case Output:
+			alt = "Output";
+			break;
+		case Alt0:
+			alt = "ALT0";
+			break;
+		case Alt1:
+			alt = "ALT1";
+			break;
+		case Alt2:
+			alt = "ALT2";
+			break;
+		case Alt3:
+			alt = "ALT3";
+			break;
+		case Alt4:
+			alt = "ALT4";
+			break;
+		case Alt5:
+			alt = "ALT5";
+			break;
+		}
+
+		printf("GPIO %d is in %s mode.\n",opt_gpio,alt);
 	}
 
 	return 0;
