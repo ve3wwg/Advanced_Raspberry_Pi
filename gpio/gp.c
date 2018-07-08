@@ -245,7 +245,6 @@ gpio_write(int gpio,int bit) {
 	if ( gpio < 0 || gpio > 31 )
 		return EINVAL;
 
-
 	if ( bit ) {
 		uint32_v *gpiop = set_gpio32(gpio,&shift,GPIO_GPSET0);
 	        *gpiop = 1u << shift;
