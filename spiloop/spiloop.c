@@ -12,13 +12,12 @@
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
-static int fd = -1;
-
 static void
 errxit(const char *msg) {
 	perror(msg);
 	exit(1);
 }
+
 int
 main(int argc, char ** argv) {
 	static uint8_t tx[] = {0x12, 0x23, 0x45, 0x67};
@@ -33,7 +32,7 @@ main(int argc, char ** argv) {
 		.cs_change = 1
 	};
 	uint8_t mode = SPI_MODE_0;
-	int rc;
+	int rc, fd=-1;
 
 	fd = open("/dev/spidev0.0",O_RDWR);
 	if ( fd < 0 )
