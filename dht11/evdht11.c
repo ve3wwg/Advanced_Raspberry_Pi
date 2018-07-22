@@ -91,15 +91,11 @@ wait_change(long *nsec) {
 
 static inline int
 read_bit(void) {
-static int flipper = 0;
-	long nsec0, nsec1;
-	int b0, b1;
+	long nsec;
 
-flipper ^= 1;
-gpio_write(4,flipper);
-	b0 = wait_change(&nsec0);
-	b1 = wait_change(&nsec1);
-	return nsec1 > 35000;
+	wait_change(&nsec);
+	wait_change(&nsec);
+	return nsec > 35000;
 }
 
 static unsigned
@@ -176,34 +172,33 @@ main(int argc,char **argv) {
 		wait_ms(30);
 		gpio_configure_io(gpio_pin,Input);
 
+gpio_write(4,1);
+		b = wait_change(&nsec);
+gpio_write(4,0);
+		if ( b == 1 )
+			b = wait_change(&nsec);
+		if ( b || nsec > 20000 ) {
+			printf("b0=%d, %ld nsec\n",b,nsec);
+			continue;
+		}
+
+		b = wait_change(&nsec);
+		if ( !b || nsec < 40000 || nsec > 90000 ) {
+			printf("b1=%d, %ld nsec\n",b,nsec);
+			continue;
+		}
 		b = wait_change(&nsec);
 
-		long nsec0 = nsec;
-		int b0 = b;
-
-		if ( b || nsec > 20000 )
+		if ( b != 0 || nsec < 40000 || nsec > 90000 ) {
+			printf("b2=%d, %ld nsec\n",b,nsec);
 			continue;
-
-		long nsec1;
-		int b1 = wait_change(&nsec1);
-
-		if ( nsec1 < 40000 || nsec1 > 90000 )
-			continue;
-
-		long nsec2;
-		int b2 = wait_change(&nsec2);
-
-		if ( nsec2 < 40000 || nsec2 > 90000 )
-			continue;
+		}
 
 		unsigned resp = read_40bits();
-		unsigned char *uc = (unsigned char *)&resp;
 
-		printf("b0=%d, %6ld nsec\n",b0,nsec0);
-		printf("b1=%d, %6ld nsec\n",b1,nsec1);
-		printf("b2=%d, %6ld nsec\n",b2,nsec2);
-	
-		printf("word = %X\n",resp);
+		if ( !resp )
+			printf("Checksum error.\n");
+		else	printf("word = %X\n",resp);
 	}
 
 	return 0;
