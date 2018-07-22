@@ -74,7 +74,7 @@ wait_ms(int ms) {
 	assert(!rc);
 }
 
-static int
+static inline int
 wait_change(long *nsec) {
 	int b1;
 	struct timespec t0, t1;
@@ -87,6 +87,38 @@ wait_change(long *nsec) {
 	timeofday(&t1);
 	*nsec = ns_diff(&t0,&t1);
 	return b1;
+}
+
+static inline int
+read_bit(void) {
+static int flipper = 0;
+	long nsec0, nsec1;
+	int b0, b1;
+
+flipper ^= 1;
+gpio_write(4,flipper);
+	b0 = wait_change(&nsec0);
+	b1 = wait_change(&nsec1);
+	return nsec1 > 35000;
+}
+
+static unsigned
+read_40bits(void) {
+	short sx = 40;
+	uint64_t acc = 0;
+
+	while ( sx-- > 0 )
+		acc |= (uint64_t)read_bit() << sx;
+
+	unsigned cksum = acc & 0xFF;
+	unsigned rh = acc >> 32;
+	unsigned temp = (acc >> 16) & 0xFF;
+	unsigned comp = (rh + temp) & 0xFF;
+
+	if ( comp != cksum )
+		return 0;
+
+	return (rh << 8) | temp;
 }
 
 static void
@@ -144,28 +176,34 @@ main(int argc,char **argv) {
 		wait_ms(30);
 		gpio_configure_io(gpio_pin,Input);
 
-gpio_write(4,1);
 		b = wait_change(&nsec);
-gpio_write(4,0);
+
 		long nsec0 = nsec;
 		int b0 = b;
 
 		if ( b || nsec > 20000 )
 			continue;
 
-gpio_write(4,1);
 		long nsec1;
 		int b1 = wait_change(&nsec1);
-gpio_write(4,0);
-gpio_write(4,1);
+
+		if ( nsec1 < 40000 || nsec1 > 90000 )
+			continue;
+
 		long nsec2;
 		int b2 = wait_change(&nsec2);
-gpio_write(4,0);
+
+		if ( nsec2 < 40000 || nsec2 > 90000 )
+			continue;
+
+		unsigned resp = read_40bits();
+		unsigned char *uc = (unsigned char *)&resp;
 
 		printf("b0=%d, %6ld nsec\n",b0,nsec0);
 		printf("b1=%d, %6ld nsec\n",b1,nsec1);
 		printf("b2=%d, %6ld nsec\n",b2,nsec2);
-		
+	
+		printf("word = %X\n",resp);
 	}
 
 	return 0;
