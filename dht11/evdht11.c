@@ -19,7 +19,7 @@
 
 static int gpio_pin = 22;
 
-static void
+static inline void
 timeofday(struct timespec *t) {
 
 	clock_gettime(CLOCK_MONOTONIC,t);
@@ -35,10 +35,10 @@ ms_diff(struct timespec *t0,struct timespec *t1) {
 	return dms;
 }
 
-static long
+static inline long
 ns_diff(struct timespec *t0,struct timespec *t1) {
 	int dsec = (int)(t1->tv_sec - t0->tv_sec);
-	long dns = (t1->tv_nsec - t0->tv_nsec) / 1000000L;
+	long dns = t1->tv_nsec - t0->tv_nsec;
 
 	assert(dsec >= 0);
 	dns += dsec * 1000000000L;
@@ -74,6 +74,21 @@ wait_ms(int ms) {
 	assert(!rc);
 }
 
+static int
+wait_change(long *nsec) {
+	int b1;
+	struct timespec t0, t1;
+	int b0 = gpio_read(gpio_pin);
+
+	timeofday(&t0);
+
+	while ( (b1 = gpio_read(gpio_pin)) == b0 )
+		;
+	timeofday(&t1);
+	*nsec = ns_diff(&t0,&t1);
+	return b1;
+}
+
 static void
 usage(const char *cmd) {
 	
@@ -88,8 +103,8 @@ usage(const char *cmd) {
 int
 main(int argc,char **argv) {
 	static char options[] = "hg:";
-	int oc;
-//	int rc;
+	long nsec;
+	int oc, b;
 
 	while ( (oc = getopt(argc,argv,options)) != -1 ) {
 		switch ( oc ) {
@@ -119,10 +134,7 @@ main(int argc,char **argv) {
 	gpio_write(gpio_pin,1);
 
 	for (;;) {
-		gpio_write(4,0);
 		wait_ready();
-		puts("Ready..");
-		gpio_write(4,1);
 
 		gpio_write(gpio_pin,1);
 		wait_ms(3);
@@ -131,6 +143,29 @@ main(int argc,char **argv) {
 		gpio_write(gpio_pin,0);
 		wait_ms(30);
 		gpio_configure_io(gpio_pin,Input);
+
+gpio_write(4,1);
+		b = wait_change(&nsec);
+gpio_write(4,0);
+		long nsec0 = nsec;
+		int b0 = b;
+
+		if ( b || nsec > 20000 )
+			continue;
+
+gpio_write(4,1);
+		long nsec1;
+		int b1 = wait_change(&nsec1);
+gpio_write(4,0);
+gpio_write(4,1);
+		long nsec2;
+		int b2 = wait_change(&nsec2);
+gpio_write(4,0);
+
+		printf("b0=%d, %6ld nsec\n",b0,nsec0);
+		printf("b1=%d, %6ld nsec\n",b1,nsec1);
+		printf("b2=%d, %6ld nsec\n",b2,nsec2);
+		
 	}
 
 	return 0;
