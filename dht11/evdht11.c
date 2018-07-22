@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
+#include <poll.h>
 #include <assert.h>
 
 #include "libgp.h"
@@ -65,6 +66,15 @@ wait_ready(void) {
 }
 
 static void
+wait_ms(int ms) {
+	struct pollfd p[1];
+	int rc;
+
+	rc = poll(&p[0],0,ms);
+	assert(!rc);
+}
+
+static void
 usage(const char *cmd) {
 	
 	printf(
@@ -79,7 +89,7 @@ int
 main(int argc,char **argv) {
 	static char options[] = "hg:";
 	int oc;
-	int rc;
+//	int rc;
 
 	while ( (oc = getopt(argc,argv,options)) != -1 ) {
 		switch ( oc ) {
@@ -102,11 +112,28 @@ main(int argc,char **argv) {
 	
 	gpio_open();
 
+	gpio_configure_io(4,Output);
+	gpio_write(4,0);
+
+	gpio_configure_io(gpio_pin,Output);
+	gpio_write(gpio_pin,1);
+
 	for (;;) {
+		gpio_write(4,0);
 		wait_ready();
-		printf("Ready time_t = %d\n",time(NULL));
+		puts("Ready..");
+		gpio_write(4,1);
+
+		gpio_write(gpio_pin,1);
+		wait_ms(3);
+		gpio_configure_io(gpio_pin,Output);
+
+		gpio_write(gpio_pin,0);
+		wait_ms(30);
+		gpio_configure_io(gpio_pin,Input);
 	}
 
 	return 0;
 }
 
+// End evdht11.c
