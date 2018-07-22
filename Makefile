@@ -1,10 +1,7 @@
-######################################################################
-# Mastering the Raspberry Pi - ISBN13: 978-1-484201-82-4
-# Warren W. Gay VE3WWG
-######################################################################
+PROJECTS = gpio evinput spiloop libusb
 
-PROJECTS = dht11 libusb pullup rtscts valt evinput mcp23017 nunchuk irdecode \
-	pads unipolar ds1307 sensor bipolar pwm
+# PROJECTS = dht11 libusb pullup rtscts valt evinput mcp23017 nunchuk irdecode \
+#	pads unipolar ds1307 sensor bipolar pwm
 
 TSTAMP = $$(date '+%Y-%m-%d')
 
@@ -28,7 +25,3 @@ tar:	clobber
 	@rm -fr /tmp/rasp-$$(date '+%Y-%m-%d')
 	@rm -f /tmp/rasp-$$(date '+%Y-%m-%d').tar.gz
 	ls -l rasp-$(TSTAMP).tar.gz
-
-######################################################################
-#  Public Domain source code.
-######################################################################
