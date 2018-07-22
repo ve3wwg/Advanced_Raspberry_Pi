@@ -13,8 +13,8 @@ all:	$(OBJS)
 	sudo chown root ./dht11
 	sudo chmod u+s ./dht11
 
-libgp.o: CFLAGS += -Os 
-# evdht11.o: CFLAGS += -Os 
+libgp.o: CFLAGS += -O3
+evdht11.o: CFLAGS += -O3
 
 clean:
 	rm -f *.o core errs.t
