@@ -9,19 +9,38 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
 #include <poll.h>
+#include <signal.h>
 #include <assert.h>
 
 #include "libgp.h"
 
 static int gpio_pin = 22;
 
+static volatile bool timeout = false;
+
+static inline void
+set_timer(long usec) {
+	static struct itimerval timer = {
+		{ 0, 0 },	// Interval
+		{ 0, 0 }	// it_value
+	};
+	int rc;
+
+	timer.it_value.tv_sec = 0;
+	timer.it_value.tv_usec = usec;
+
+	rc = setitimer(ITIMER_REAL,&timer,NULL);
+	assert(!rc);
+	timeout = false;
+}
+
 static inline void
 timeofday(struct timespec *t) {
-
 	clock_gettime(CLOCK_MONOTONIC,t);
 }
 
@@ -82,11 +101,16 @@ wait_change(long *nsec) {
 
 	timeofday(&t0);
 
-	while ( (b1 = gpio_read(gpio_pin)) == b0 )
+	while ( (b1 = gpio_read(gpio_pin)) == b0 && !timeout )
 		;
 	timeofday(&t1);
-	*nsec = ns_diff(&t0,&t1);
-	return b1;
+
+	if ( !timeout ) {
+		*nsec = ns_diff(&t0,&t1);
+		return b1;
+	}
+	*nsec = 0;
+	return 0;
 }
 
 static inline int
@@ -118,6 +142,11 @@ read_40bits(void) {
 }
 
 static void
+sigalrm_handler(int signo) {
+	timeout = true;
+}
+
+static void
 usage(const char *cmd) {
 	
 	printf(
@@ -131,6 +160,7 @@ usage(const char *cmd) {
 int
 main(int argc,char **argv) {
 	static char options[] = "hg:";
+	struct sigaction new_action;
 	long nsec;
 	int oc, b;
 
@@ -153,6 +183,11 @@ main(int argc,char **argv) {
 		}		
 	}
 	
+	new_action.sa_handler = sigalrm_handler;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+	sigaction(SIGALRM,&new_action,NULL);
+
 	gpio_open();
 
 	gpio_configure_io(4,Output);
@@ -167,6 +202,7 @@ main(int argc,char **argv) {
 		gpio_write(gpio_pin,1);
 		wait_ms(3);
 		gpio_configure_io(gpio_pin,Output);
+		set_timer(100000);	// 100 ms
 
 		gpio_write(gpio_pin,0);
 		wait_ms(30);
