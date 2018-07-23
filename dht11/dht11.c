@@ -191,9 +191,6 @@ main(int argc,char **argv) {
 
 	gpio_open();
 
-	gpio_configure_io(4,Output);
-	gpio_write(4,0);
-
 	gpio_configure_io(gpio_pin,Output);
 	gpio_write(gpio_pin,1);
 
