@@ -198,8 +198,9 @@ main(int argc,char **argv) {
 		wait_ready();
 
 		gpio_write(gpio_pin,1);
-		wait_ms(3);
 		gpio_configure_io(gpio_pin,Output);
+		wait_ms(3);
+
 		set_timer(100000);	// 100 ms
 
 		gpio_write(gpio_pin,0);
