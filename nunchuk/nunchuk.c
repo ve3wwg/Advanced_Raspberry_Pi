@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <linux/i2c-dev.h>
 #include <linux/input.h>
 #include <linux/uinput.h>
@@ -44,8 +45,7 @@ i2c_init(const char *node) {
 	i2c_fd = open(node,O_RDWR);	/* Open driver /dev/i2s-1 */
 	if ( i2c_fd < 0 ) {
 		perror("Opening /dev/i2s-1");
-		puts("Check that the i2c-dev & i2c-bcm2708 kernel modules "
-		     "are loaded.");
+		puts("Check that I2C has been enabled in the control panel\n");
 		abort();
 	}
 
@@ -352,12 +352,12 @@ curve(int relxy) {
 	int mv = 1;			/* Smallest step */
 
 	if ( ax > 100 )
-		mv = 10;		/* Take large steps */
+		mv = 25;		/* Take large steps */
 	else if ( ax > 65 )
+		mv = 15;
+	else if ( ax > 40 )
 		mv = 7;
-	else if ( ax > 35 )
-		mv = 5;
-	else if ( ax > 15 )
+	else if ( ax > 30 )
 		mv = 2;			/* 2nd smallest step */
 	return mv * sgn;
 }
@@ -367,9 +367,12 @@ curve(int relxy) {
  */
 int
 main(int argc,char **argv) {
-	int fd, need_sync, init = 3;
+	int fd, need_sync;
 	int rel_x=0, rel_y = 0;
-	nunchuk_t data0, data, last;
+	unsigned minx=~0, miny=~0;		/* x center */
+	unsigned maxx=0, maxy=0;		/* y center */
+	int centerx, centery;
+	nunchuk_t data0, data;
 
 	if ( argc > 1 && !strcmp(argv[1],"-d") )
 		f_debug = 1;			/* Enable debug messages */
@@ -382,6 +385,31 @@ main(int argc,char **argv) {
 	signal(SIGINT,sigint_handler);		/* Trap on SIGINT */
 	fd = uinput_open();			/* Open /dev/uinput */
 
+	{
+		time_t t0, t1;
+
+		t0 = time(NULL);
+		do	{
+			if ( !nunchuk_read(&data0) ) {
+				if ( data0.stick_x < minx )
+					minx = data0.stick_x;
+				if ( data0.stick_x > maxx )
+					maxx = data0.stick_x;
+				if ( data0.stick_y < miny )
+					miny = data0.stick_y;
+				if ( data0.stick_y > maxy )
+					maxy = data0.stick_y;
+			}
+		} while ( (t1 = time(NULL)) - t0 < 2 );
+	}
+
+	--minx;
+	--miny;
+	++maxx;
+	++maxy;
+	centerx = (int) data0.stick_x;
+	centery = (int) data0.stick_y;
+
 	while ( !is_signaled ) {
 		if ( nunchuk_read(&data) < 0 )
 			continue;
@@ -389,37 +417,33 @@ main(int argc,char **argv) {
 		if ( f_debug )
 			dump_data(&data);	/* Dump nunchuk data */
 
-		if ( init > 0 && !data0.stick_x && !data0.stick_y ) {
-			data0 = data;		/* Save initial values */
-			last = data;
-			--init;
-			continue;	
-		}
-
 		need_sync = 0;
-		if ( abs(data.stick_x - data0.stick_x) > 2 
-		  || abs(data.stick_y - data0.stick_y) > 2 ) {
-			rel_x = curve(data.stick_x - data0.stick_x);
-			rel_y = curve(data.stick_y - data0.stick_y);
-			if ( rel_x || rel_y ) {
-				uinput_movement(fd,rel_x,-rel_y);
-				need_sync = 1;
-			}
+		if ( data.stick_x >= minx && data.stick_x << maxx )
+			rel_x = 0;
+		else	rel_x = curve((int)data.stick_x - centerx);
+
+		if ( data.stick_y >= miny && data.stick_y << maxy )
+			rel_y = 0;
+		else	rel_y = curve((int)data.stick_y - centery);
+
+		if ( abs(rel_x) >= 2 || abs(rel_y) >= 2 ) {
+			uinput_movement(fd,rel_x,-rel_y);
+			need_sync = 1;
 		}
 
-		if ( last.z_button != data.z_button ) {
+		if ( data0.z_button != data.z_button ) {
 			uinput_click(fd,data.z_button,1);
 			need_sync = 1;
 		}
 
-		if ( last.c_button != data.c_button ) {
+		if ( data0.c_button != data.c_button ) {
 			uinput_click(fd,data.c_button,4);
 			need_sync = 1;
 		}
 
 		if ( need_sync )
 			uinput_syn(fd);
-		last = data;
+		data0 = data;
 	}
 
 	putchar('\n');
