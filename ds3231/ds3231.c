@@ -221,6 +221,8 @@ usage(const char *argv0) {
 		"where:\n"
 		"\t-s\tSet RTC clock based upon system date\n"
 		"\t-f fmt\tSet date format\n"
+		"\t-e\tEnable 1 Hz output on SQW\n"
+		"\t-d\tDisable 1 Hz output on SQW\n"
 		"\t-h\tThis help\n",
 		cmd);
 }
@@ -230,9 +232,11 @@ usage(const char *argv0) {
  */
 int
 main(int argc,char **argv) {
-	static char options[] = "hsf:";
+	static char options[] = "hsf:dev";
 	ds3231_regs_t rtc;		/* DS3231 Registers */
 	bool opt_s = false;
+	bool opt_e = false, opt_d = false;
+	bool opt_v = false;
 	struct tm t0, t1;		/* Unix date/time values */
 	char *date_format = "%Y-%m-%d %H:%M:%S (%A)";
 	char dtbuf[256];		/* Formatted date/time */
@@ -240,11 +244,22 @@ main(int argc,char **argv) {
 
 	while ( (oc = getopt(argc,argv,options)) != -1 ) {
 		switch ( oc ) {
+		case 'e':
+			opt_e = true;
+			opt_d = false;
+			break;
+		case 'd':
+			opt_d = true;
+			opt_e = false;
+			break;
 		case 'f':
 			date_format = optarg;
 			break;
 		case 's':
 			opt_s = true;
+			break;
+		case 'v':
+			opt_v = true;
 			break;
 		case 'h':
 			usage(argv[0]);
@@ -292,7 +307,7 @@ main(int argc,char **argv) {
 		rtc.s01.mins_1s = t.tm_min % 10;
 
 		if ( !i2c_wr_rtc(&rtc) ) {
-			perror("Reading DS3231 RTC clock.");
+			perror("Writing DS3231 RTC clock.");
 			exit(1);
 		}
 		if ( !i2c_rd_rtc(&rtc) ) {
@@ -335,6 +350,26 @@ main(int argc,char **argv) {
 
 	strftime(dtbuf,sizeof dtbuf,date_format,&t1);
 	puts(dtbuf);
+
+	/*
+	 * Process enable/disable of 1 Hz output:
+	 */
+	if ( opt_e || opt_d ) {
+		rtc.s0E.BBSQW = opt_e;	/* Enable (or not) */
+		rtc.s0E.INTCN = !opt_e;	/* SQW out when zero */
+		if ( opt_e ) {
+			rtc.s0E.RS1 = rtc.s0E.RS2 = 0; /* 1 Hz */
+		}
+		if ( !i2c_wr_rtc(&rtc) ) {
+			perror("Writing DS3231 RTC clock for -e/-d.");
+			exit(1);
+		}
+	}
+	if ( opt_v ) {
+		printf(" BBSQW=%d INTCN=%d RS2=%d RS1=%d\n",
+			rtc.s0E.BBSQW,rtc.s0E.INTCN,
+			rtc.s0E.RS2,rtc.s0E.RS1);
+	}
 
 	i2c_close();
 	return 0;
