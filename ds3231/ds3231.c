@@ -3,6 +3,8 @@
  * Warren W. Gay VE3WWG
  *********************************************************************/
 
+#define _XOPEN_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -13,6 +15,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
+#include <time.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <linux/i2c-dev.h>
@@ -119,11 +123,14 @@ struct s_ds3231_regs {
 	struct s_10 {			/* Aging offset */
 		int8_t data	 : 8;	/* Data */
 	} s10;
-	struct s_1112 {
-		int16_t data	 : 10;	/* Signed temp */
-		int16_t zeros	 : 6;	/* Zero bits */
-	} s1112;
-};
+	struct s_11 {
+		int8_t temp	 : 8;	/* Signed int temp */
+	} s11;
+	struct s_12 {
+		uint8_t mbz      : 6;
+		uint8_t	frac     : 2;	/* Fractional temp bits */
+	} s12;
+} __attribute__((packed));
 	
 typedef struct s_ds3231_regs ds3231_regs_t;
 
@@ -209,6 +216,34 @@ i2c_wr_rtc(ds3231_regs_t *rtc) {
 	return ioctl(i2c_fd,I2C_RDWR,&msgset) == 1;
 }
 
+static float
+read_temp(void) {
+	ds3231_regs_t rtc;
+
+	do	{
+		if ( !i2c_rd_rtc(&rtc) ) {
+			perror("Reading RTC for temp.");
+			exit(2);
+		}
+	} while ( rtc.s0F.bsy );	/* Until not busy */
+
+	rtc.s0E.CONV = 1;		/* Start conversion */
+
+	if ( !i2c_wr_rtc(&rtc) ) {
+		perror("Writing RTC to read temp.");
+		exit(2);
+	}
+
+	do	{
+		if ( !i2c_rd_rtc(&rtc) ) {
+			perror("Reading RTC for conversion.");
+			exit(2);
+		}
+	} while ( rtc.s0E.CONV );	/* Until converted */
+	
+	return rtc.s11.temp + (float)rtc.s12.frac * 0.25;
+}
+
 static void
 usage(const char *argv0) {
 	const char *cmd = strrchr(argv0,'/');
@@ -217,12 +252,15 @@ usage(const char *argv0) {
 		cmd = argv0;
 
 	printf(
-		"Usage:\t%s [-s] [-f format] [-h]\n"
+		"Usage:\t%s [-s] [-f format] [-d] [-e] [-v] [-h]\n"
 		"where:\n"
 		"\t-s\tSet RTC clock based upon system date\n"
 		"\t-f fmt\tSet date format\n"
 		"\t-e\tEnable 1 Hz output on SQW\n"
 		"\t-d\tDisable 1 Hz output on SQW\n"
+		"\t-t\tDisplay temperature\n"
+		"\t-S\tSet system time from DS3231 time\n"
+		"\t-v\tVerbose, show SQW register settings\n"
 		"\t-h\tThis help\n",
 		cmd);
 }
@@ -232,11 +270,13 @@ usage(const char *argv0) {
  */
 int
 main(int argc,char **argv) {
-	static char options[] = "hsf:dev";
+	static char options[] = "hsf:devtS:";
 	ds3231_regs_t rtc;		/* DS3231 Registers */
 	bool opt_s = false;
 	bool opt_e = false, opt_d = false;
 	bool opt_v = false;
+	bool opt_t = false;
+	const char *opt_S = NULL;
 	struct tm t0, t1;		/* Unix date/time values */
 	char *date_format = "%Y-%m-%d %H:%M:%S (%A)";
 	char dtbuf[256];		/* Formatted date/time */
@@ -257,6 +297,12 @@ main(int argc,char **argv) {
 			break;
 		case 's':
 			opt_s = true;
+			break;
+		case 'S':
+			opt_S = optarg;
+			break;
+		case 't':
+			opt_t = true;
 			break;
 		case 'v':
 			opt_v = true;
@@ -282,13 +328,21 @@ main(int argc,char **argv) {
 		exit(1);
 	}
 
-	if ( opt_s ) {
+	if ( opt_s || opt_S ) {
 		time_t now;
 		struct tm t;
-		int yr;
+		int yr, dst;
 
 		time(&now);
 		localtime_r(&now,&t);
+		dst = t.tm_isdst;
+
+		if ( opt_S ) {
+			memset(&t,0,sizeof t);
+			strptime(opt_S,date_format,&t);
+			t.tm_isdst = dst;
+			mktime(&t); 	// Fix tm_wday
+		}
 
 		rtc.s05.century = (yr = t.tm_year) >= 100 ? 1 : 0;
 		if ( rtc.s05.century ) 
@@ -310,6 +364,10 @@ main(int argc,char **argv) {
 			perror("Writing DS3231 RTC clock.");
 			exit(1);
 		}
+
+		strftime(dtbuf,sizeof dtbuf,date_format,&t);
+		printf("Set RTC to %s\n",dtbuf);
+
 		if ( !i2c_rd_rtc(&rtc) ) {
 			perror("Reading DS3231 RTC clock.");
 			exit(1);
@@ -349,7 +407,7 @@ main(int argc,char **argv) {
 	}
 
 	strftime(dtbuf,sizeof dtbuf,date_format,&t1);
-	puts(dtbuf);
+	printf("RTC time is %s\n",dtbuf);
 
 	/*
 	 * Process enable/disable of 1 Hz output:
@@ -369,6 +427,12 @@ main(int argc,char **argv) {
 		printf(" BBSQW=%d INTCN=%d RS2=%d RS1=%d\n",
 			rtc.s0E.BBSQW,rtc.s0E.INTCN,
 			rtc.s0E.RS2,rtc.s0E.RS1);
+	}
+
+	if ( opt_t ) {
+		float temp = read_temp();
+
+		printf("Temperature is %.2f C\n",temp);
 	}
 
 	i2c_close();
