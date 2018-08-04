@@ -270,6 +270,7 @@ usage(const char *argv0) {
  */
 int
 main(int argc,char **argv) {
+	static char *date_format = "%Y-%m-%d %H:%M:%S (%A)";
 	static char options[] = "hsf:devtS:";
 	ds3231_regs_t rtc;		/* DS3231 Registers */
 	bool opt_s = false;
@@ -277,8 +278,7 @@ main(int argc,char **argv) {
 	bool opt_v = false;
 	bool opt_t = false;
 	const char *opt_S = NULL;
-	struct tm t0, t1;		/* Unix date/time values */
-	char *date_format = "%Y-%m-%d %H:%M:%S (%A)";
+	struct tm t;			/* Unix date/time values */
 	char dtbuf[256];		/* Formatted date/time */
 	int oc;
 
@@ -317,11 +317,11 @@ main(int argc,char **argv) {
 	}
 	
 	/*
-	 * Initialize I2C and clear rtc and t1 structures:
+	 * Initialize I2C and clear rtc and t structures:
 	 */
 	i2c_init(node);				/* Initialize for I2C */
 	memset(&rtc,0,sizeof rtc);
-	memset(&t1,0,sizeof t1);
+	memset(&t,0,sizeof t);
 
 	if ( !i2c_rd_rtc(&rtc) ) {
 		perror("Reading DS3231 RTC clock.");
@@ -330,7 +330,6 @@ main(int argc,char **argv) {
 
 	if ( opt_s || opt_S ) {
 		time_t now;
-		struct tm t;
 		int yr, dst;
 
 		time(&now);
@@ -344,10 +343,8 @@ main(int argc,char **argv) {
 			mktime(&t); 	// Fix tm_wday
 		}
 
-		rtc.s05.century = (yr = t.tm_year) >= 100 ? 1 : 0;
-		if ( rtc.s05.century ) 
-			yr -= 100;
-
+		rtc.s05.century = 0;
+		yr = t.tm_year - 100;
 		rtc.s06.year_10s = yr / 10;
 		rtc.s06.year_1s = yr % 10;
 		rtc.s05.month_10s = (t.tm_mon + 1) / 10;
@@ -375,38 +372,19 @@ main(int argc,char **argv) {
 	}
 
 	/*
-	 * Check the date returned by the RTC:
+	 * Report RTC clock time:
 	 */
-	memset(&t1,0,sizeof t1);
+	memset(&t,0,sizeof t);
+	t.tm_year = rtc.s06.year_10s * 10 + rtc.s06.year_1s + 100;
+	t.tm_mon  = rtc.s05.month_10s * 10 + rtc.s05.month_1s - 1;
+	t.tm_mday = rtc.s04.day_10s   * 10 + rtc.s04.day_1s;
+	t.tm_hour = rtc.u02.hr24.hour_10s * 10 + rtc.u02.hr24.hour_1s;
+	t.tm_min  = rtc.s01.mins_10s  * 10 + rtc.s01.mins_1s;
+	t.tm_sec  = rtc.s00.secs_10s  * 10 + rtc.s00.secs_1s;
+	t.tm_wday = rtc.s03.wkday - 1;
+	t.tm_isdst = 0;	
 
-	t1.tm_year = rtc.s06.year_10s * 10 + rtc.s06.year_1s;
-	if ( rtc.s05.century ) 
-		t1.tm_year += 100;
-
-	t1.tm_mon  = rtc.s05.month_10s * 10 + rtc.s05.month_1s - 1;
-	t1.tm_mday = rtc.s04.day_10s   * 10 + rtc.s04.day_1s;
-	t1.tm_hour = rtc.u02.hr24.hour_10s * 10 + rtc.u02.hr24.hour_1s;
-	t1.tm_min  = rtc.s01.mins_10s  * 10 + rtc.s01.mins_1s;
-	t1.tm_sec  = rtc.s00.secs_10s  * 10 + rtc.s00.secs_1s;
-	t1.tm_isdst = 0;	
-
-	t0 = t1;
-	if ( mktime(&t1) == 1L 			/* t1 is modified */
-	  || t1.tm_year   != t0.tm_year || t1.tm_mon    != t0.tm_mon
-	  || t1.tm_mday   != t0.tm_mday || t1.tm_hour   != t0.tm_hour
-	  || t1.tm_min    != t0.tm_min  || t1.tm_sec    != t0.tm_sec ) {
-		strftime(dtbuf,sizeof dtbuf,date_format,&t0);
-		fprintf(stderr,"Read RTC date is not valid: %s\n",dtbuf);
-		exit(2);
-	}
-
-	if ( t1.tm_wday != rtc.s03.wkday-1 ) {
-		fprintf(stderr,
-			"Warning: RTC weekday is incorrect %d but should be %d\n",
-			rtc.s03.wkday,t1.tm_wday);
-	}
-
-	strftime(dtbuf,sizeof dtbuf,date_format,&t1);
+	strftime(dtbuf,sizeof dtbuf,date_format,&t);
 	printf("RTC time is %s\n",dtbuf);
 
 	/*
