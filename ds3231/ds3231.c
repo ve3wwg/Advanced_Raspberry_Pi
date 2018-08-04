@@ -4,7 +4,6 @@
  *********************************************************************/
 
 #define _XOPEN_SOURCE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -169,7 +168,7 @@ i2c_close(void) {
 }
 
 /*
- * Read: [S] 0xB1 <regaddr> <rtcbuf[0]> ... <rtcbuf[n-1]> [P]
+ * Read RTC
  */
 static bool
 i2c_rd_rtc(ds3231_regs_t *rtc) {
@@ -194,7 +193,7 @@ i2c_rd_rtc(ds3231_regs_t *rtc) {
 }
 
 /*
- * Write [S] 0xB0 <regaddr> <rtcbuf[0]> ... <rtcbuf[n-1]> [P]
+ * Write RTC
  */
 static bool
 i2c_wr_rtc(ds3231_regs_t *rtc) {
@@ -216,6 +215,9 @@ i2c_wr_rtc(ds3231_regs_t *rtc) {
 	return ioctl(i2c_fd,I2C_RDWR,&msgset) == 1;
 }
 
+/*
+ * Read RTC temperature:
+ */
 static float
 read_temp(void) {
 	ds3231_regs_t rtc;
@@ -244,6 +246,9 @@ read_temp(void) {
 	return rtc.s11.temp + (float)rtc.s12.frac * 0.25;
 }
 
+/*
+ * Display command usage:
+ */
 static void
 usage(const char *argv0) {
 	const char *cmd = strrchr(argv0,'/');
