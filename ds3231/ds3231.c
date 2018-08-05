@@ -60,7 +60,7 @@ struct s_ds3231_regs {
 		uint8_t	century  : 1;	/* Century */
 	} s05;
 	struct s_06 {			/* Year */
-		uint8_t	year_1s  : 4;	/* Ones digit: BCD year (00-99) */
+		uint8_t	year_1s  : 4;	/* Ones digit: BCD year */
 		uint8_t	year_10s : 4;	/* Tens digit: BCD year */
 	} s06;
 	struct s_07 {			/* Alarm Seconds */
@@ -88,12 +88,14 @@ struct s_ds3231_regs {
 	} u09;				/* Alarm 1 Hours */
 	union u_0A {			/* Alarm Date */
 		struct 	{
-			uint8_t	day10    : 2;	/* Alarm 10s date */
+			uint8_t	day1s    : 4;	/* Alarm 1s date */
+			uint8_t day10s   : 2;   /* 10s date */
 			uint8_t	dydt     : 1;	/* Alarm dy=1 */
 			uint8_t	AxM4	 : 1;	/* Alarm Mask 4 */
 		} dy;
 		struct	{
-			uint8_t	day10    : 3;	/* Alarm 10s date */
+			uint8_t	day1s    : 4;	/* Alarm 1s date */
+			uint8_t	day10    : 2;	/* Alarm 10s date */
 			uint8_t	dydt     : 1;	/* Alarm dt=0 */
 			uint8_t	AxM4	 : 1;	/* Alarm Mask 4 */
 		} dt;
@@ -227,7 +229,7 @@ read_temp(void) {
 			perror("Reading RTC for temp.");
 			exit(2);
 		}
-	} while ( rtc.s0F.bsy );	/* Until not busy */
+	} while ( rtc.s0F.bsy || rtc.s0E.CONV ); /* Until not busy */
 
 	rtc.s0E.CONV = 1;		/* Start conversion */
 
@@ -264,7 +266,7 @@ usage(const char *argv0) {
 		"\t-e\tEnable 1 Hz output on SQW\n"
 		"\t-d\tDisable 1 Hz output on SQW\n"
 		"\t-t\tDisplay temperature\n"
-		"\t-S\tSet system time from DS3231 time\n"
+		"\t-S time\tSet DS3231 time from given\n"
 		"\t-v\tVerbose, show SQW register settings\n"
 		"\t-h\tThis help\n",
 		cmd);
@@ -361,6 +363,8 @@ main(int argc,char **argv) {
 		rtc.u02.hr24.hour_1s = t.tm_hour % 10;
 		rtc.s01.mins_10s = t.tm_min / 10;
 		rtc.s01.mins_1s = t.tm_min % 10;
+		rtc.s00.secs_10s = t.tm_sec / 10;
+		rtc.s00.secs_1s = t.tm_sec % 10;
 
 		if ( !i2c_wr_rtc(&rtc) ) {
 			perror("Writing DS3231 RTC clock.");
