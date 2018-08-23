@@ -259,7 +259,7 @@ usage(const char *argv0) {
 		cmd = argv0;
 
 	printf(
-		"Usage:\t%s [-s] [-f format] [-d] [-e] [-v] [-h]\n"
+		"Usage:\t%s [-S time] [-f format] [-d] [-e] [-v] [-h]\n"
 		"where:\n"
 		"\t-s\tSet RTC clock based upon system date\n"
 		"\t-f fmt\tSet date format\n"
