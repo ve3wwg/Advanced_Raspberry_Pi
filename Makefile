@@ -1,7 +1,5 @@
-PROJECTS = gpio evinput spiloop libusb
 
-# PROJECTS = dht11 libusb pullup rtscts valt evinput mcp23017 nunchuk irdecode \
-#	pads unipolar ds1307 sensor bipolar pwm
+PROJECTS = dht11 ds3231 evinput gpio nunchuk spiloop # libusb
 
 TSTAMP = $$(date '+%Y-%m-%d')
 
@@ -12,7 +10,7 @@ clean:
 	for dir in $(PROJECTS) ; do make -C $$dir clean ; done
 
 clobber:
-	for dir in $(PROJECTS) ; do make -C $$dir clobber ; done
+	for dir in $(PROJECTS) libusb ; do make -C $$dir clobber ; done
 	find . -name '*.t' -exec rm -f {} \;
 
 tar:	clobber
